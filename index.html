@@ -1,0 +1,213 @@
+<!doctype html>
+<!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js ie7 oldie" lang="en"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en"> <!--<![endif]-->
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+	<title>Mafaro Disqus Dashboard</title>
+	<meta name="description" content="">
+	<meta name="author" content="">
+
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+
+	<!-- CSS concatenated and minified via ant build script-->
+	<link rel="stylesheet" href="css/reset.css">
+	<link rel="stylesheet" href="css/bootstrap.min.css">
+	<link rel="stylesheet" href="css/style.css">
+	<!-- end CSS-->
+
+	<script src="js/libs/modernizr-2.0.6.min.js"></script>
+</head>
+
+<body>
+
+	<div id="container" class="container">
+		<header>
+		<h1>Mafaro Disqus Dashboard</h1>
+		</header>
+		<div id="main" role="main">
+            <form>
+                <div id="view_selection" class="btn-group">
+                    <!--
+                    <a href="#" id="active" class="btn active">Most Active Users</a>
+                    <a href="#" id="liked" class="btn">Most Liked Users</a>
+                    <a href="#" id="hot" class="btn">Hottest Threads</a>
+                    -->
+                    <input type="button" name="dataset" id="active" value="Most Active Users" class="btn active" />
+                    <input type="button" name="dataset" id="liked" value=" Most Liked Users" class="btn" />
+                    <input type="button" name="dataset" id="hot" value="Hottest Threads" class="btn" />
+
+                </div>
+			</form>
+            <div class="pull-right"><h3 id="title">Number of Posts</h3></div>
+            <div id="vis">	</div>
+		</div>
+		<footer>
+		<p>A demonstration of bar charts in D3.js</p>
+		<p><a href="#">Blog Post</a> | <a href="#">Code</a> | <a href="http://www.mafaro.co.uk/">Data</a></p>
+		</footer>
+	</div> <!--! end of #container -->
+
+
+	<!-- <script src="//ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script> -->
+	<script>window.jQuery || document.write('<script src="js/libs/jquery-1.6.2.min.js"><\/script>')</script>
+
+	<script defer src="js/plugins.js"></script>
+	<script defer src="js/script.js"></script>
+	<script src="js/CustomTooltip.js"></script>
+	<script src="js/libs/d3.js"></script>
+	<script type="text/javascript">
+        var API_KEY = 'WDmcI7JA5xPPKcsAltWYvHIHDt9xk3aq6bweNhLMyDKibvAfHhQFOar0nZXKQZ5o',
+            API_SECRET = '0cUEryB1BXZ7a9lKYJsvZbHKtESbMH7pdTbuWQk92npUFguzMzDbcTaOVDS9e4Qb',
+            dataset = 'forums/listMostActiveUsers.json?forum=mafaro',
+            nameKey = 'name',
+            valueKey = 'numPosts',
+            title = 'Number of Posts';
+
+        //set up svg using margin conventions - we'll need plenty of room on the left for labels
+        var margin = {
+            top: 15,
+            right: 25,
+            bottom: 15,
+            left: 250
+        };
+
+        var width = 960 - margin.left - margin.right,
+            height = 500 - margin.top - margin.bottom;
+
+        var x = d3.scale.linear()
+                .range([0, width]);
+
+        var y = d3.scale.ordinal()
+                .rangeRoundBands([height, 0], .1);
+
+        //make y axis to show bar names
+        var yAxis = d3.svg.axis()
+                .scale(y)
+                //no tick marks
+                .tickSize(0)
+                .orient("left");
+
+        var svg = d3.select("#vis").append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+        d3.selectAll("input").on("click", selectDataset);
+
+        function selectDataset() {
+            var value = this.id;
+            var forum = "mafaro";
+
+            if (value === "active") {
+                dataset = 'forums/listMostActiveUsers.json?forum='+forum;
+                valueKey = 'numPosts';
+                nameKey = 'name';
+                title = 'Number of Posts';
+
+            } else if (value == "liked") {
+                dataset = 'forums/listMostActiveUsers.json?forum='+forum;
+                valueKey = 'numVotes';
+                nameKey = 'name';
+                title = 'Number of Votes';
+            } else if (value == "hot") {
+                dataset = 'threads/listPopular.json?forum='+forum;
+                nameKey = 'clean_title';
+                valueKey = 'posts';
+                title = 'Number of Comments';
+            }
+            d3.selectAll(".chart").remove();
+            d3.selectAll(".label").remove();
+
+            change(dataset);
+            d3.selectAll(".btn").classed("active", false);
+            d3.select('input[id=\"'+value+'\"]').attr("class", "btn active");
+            d3.select('#title').html(title);
+        }
+
+
+        change(dataset);
+
+		function change(dataset) {
+            var url = 'https://disqus.com/api/3.0/'+dataset+'&api_key='+API_KEY+'&api_secret='+API_SECRET;
+            d3.json(url, function (res) {
+
+                var data = res.response.map(function(d){
+                    return {
+                        "name": d[nameKey],
+                        "value": d[valueKey]
+                    }
+                });
+                        //.filter(function(d){ return d.name !== "risotto"; });
+
+                //sort bars based on value
+                data = data.sort(function (a, b) {
+                    return d3.ascending(a.value, b.value);
+                })
+
+                x.domain([0, d3.max(data, function (d) { return d.value; })]);
+                y.domain(data.map(function (d) { return d.name; }));
+
+                svg.selectAll(".y.axis").remove();
+
+
+                svg.append("g")
+                    .attr("class", "y axis")
+                    .call(yAxis)
+
+
+                var bars = svg.selectAll(".bar")
+                    .data(data);
+
+                              // new data:
+                /*
+                bars.enter()
+                    .append("g")
+                    .attr("class", "chart");
+                    */
+
+                //append rects
+                bars.enter().append("g")
+                    .attr("class", "chart").append("rect")
+                    .attr("class", "bar")
+                    .attr("y", function (d) { return y(d.name); })
+                    .attr("height", y.rangeBand())
+                    .attr("x", 0)
+                    .attr("width", function (d) { return x(d.value); });
+
+
+                //add a value label to the right of each bar
+                bars.append("text")
+                    .attr("class", "label")
+                    //y position of the label is halfway down the bar
+                    .attr("y", function (d) { return y(d.name) + y.rangeBand() / 2 + 4; })
+                    //x position is 3 pixels to the right of the bar
+                    .attr("x", function (d) { return x(d.value) - 3; })
+                    .text(function (d) { return d.value; });
+
+                // removed data:
+                bars.exit().remove();
+
+                // updated data:
+                bars.transition()
+                    .duration(1000)
+                    .attr("x", function(d) { return 0; })
+                    .attr("y", function(d) { return y(d.name); })
+                    .attr("width", function(d) { return x(d.value); })
+                    .attr("height", y.rangeBand());
+            });
+        }
+	</script>
+
+
+	<!--[if lt IE 7 ]>
+		<script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>
+		<script>window.attachEvent('onload',function(){CFInstall.check({mode:'overlay'})})</script>
+	<![endif]-->
+	
+</body>
+</html>
