@@ -134,7 +134,7 @@
 
 		function change(dataset) {
             var url = 'https://disqus.com/api/3.0/'+dataset+'&api_key='+API_KEY+'&api_secret='+API_SECRET;
-            d3.json(url, function (res) {
+            $.get(url, function (res) {
 
                 var data = res.response.map(function(d){
                     return {
